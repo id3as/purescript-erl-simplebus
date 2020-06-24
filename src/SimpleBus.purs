@@ -9,24 +9,21 @@ import Erl.Process.Raw (Pid)
 import Data.Newtype (unwrap, wrap, class  Newtype)
 import Stetson.Types (ReceivingStetsonHandler)
 
-foreign import subscribe_ :: forall msg. BusName -> (msg -> Effect Unit) -> Effect SubscriptionRef 
+foreign import subscribe_ :: forall name msg. Bus name msg -> (msg -> Effect Unit) -> Effect SubscriptionRef 
 foreign import unsubscribe :: SubscriptionRef -> Effect Unit
-foreign import raise_ :: forall msg. BusName -> msg -> Effect Unit 
+foreign import raise_ :: forall name msg. Bus name msg -> msg -> Effect Unit 
 
 newtype SubscriptionRef = SubscriptionRef Pid
-newtype BusName = BusName String
 
-derive instance ntBusName :: Newtype BusName _
+newtype Bus name msg = Bus name
 
-data Bus msg = Bus BusName
+bus :: forall msg name. name -> Bus name msg
+bus name  = Bus $ name
 
-bus :: forall msg. String -> Bus msg
-bus name  = Bus $ BusName name
+raise :: forall name msg. Bus name msg ->  msg -> Effect Unit
+raise bus msg =
+  raise_ bus msg
 
-raise :: forall msg. Bus msg ->  msg -> Effect Unit
-raise (Bus name) msg =
-  raise_ name msg
-
-subscribe :: forall msg. Bus msg -> (msg -> Effect Unit) ->  Effect SubscriptionRef
-subscribe (Bus name) callback = 
-  subscribe_ name callback
+subscribe :: forall name msg. Bus name msg -> (msg -> Effect Unit) ->  Effect SubscriptionRef
+subscribe bus callback = 
+  subscribe_ bus callback
