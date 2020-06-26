@@ -7,7 +7,6 @@ import Effect (Effect)
 import Data.Maybe (Maybe(..))
 import Erl.Process.Raw (Pid)
 import Data.Newtype (unwrap, wrap, class  Newtype)
-import Stetson.Types (ReceivingStetsonHandler)
 
 foreign import subscribe_ :: forall name msg. Bus name msg -> (msg -> Effect Unit) -> Effect SubscriptionRef 
 foreign import unsubscribe :: SubscriptionRef -> Effect Unit
