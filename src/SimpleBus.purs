@@ -1,28 +1,28 @@
 module SimpleBus where
 
 import Prelude
-import Pinto (ServerName(..))
-import Pinto.Gen as Gen
 import Effect (Effect)
 import Data.Maybe (Maybe(..))
 import Erl.Process.Raw (Pid)
-import Data.Newtype (unwrap, wrap, class  Newtype)
+import Data.Newtype (unwrap, wrap, class Newtype)
 
-foreign import subscribe_ :: forall name msg. Bus name msg -> (msg -> Effect Unit) -> Effect SubscriptionRef 
+foreign import subscribe_ :: forall name msg. Bus name msg -> (msg -> Effect Unit) -> Effect SubscriptionRef
+
 foreign import unsubscribe :: SubscriptionRef -> Effect Unit
-foreign import raise_ :: forall name msg. Bus name msg -> msg -> Effect Unit 
 
-newtype SubscriptionRef = SubscriptionRef Pid
+foreign import raise_ :: forall name msg. Bus name msg -> msg -> Effect Unit
 
-newtype Bus name msg = Bus name
+newtype SubscriptionRef
+  = SubscriptionRef Pid
+
+newtype Bus name msg
+  = Bus name
 
 bus :: forall msg name. name -> Bus name msg
-bus name  = Bus $ name
+bus name = Bus $ name
 
-raise :: forall name msg. Bus name msg ->  msg -> Effect Unit
-raise bus msg =
-  raise_ bus msg
+raise :: forall name msg. Bus name msg -> msg -> Effect Unit
+raise bus msg = raise_ bus msg
 
-subscribe :: forall name msg. Bus name msg -> (msg -> Effect Unit) ->  Effect SubscriptionRef
-subscribe bus callback = 
-  subscribe_ bus callback
+subscribe :: forall name msg. Bus name msg -> (msg -> Effect Unit) -> Effect SubscriptionRef
+subscribe bus callback = subscribe_ bus callback
