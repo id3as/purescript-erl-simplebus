@@ -1,22 +1,7 @@
-.PHONY: all clean test
+.PHONY: all build test
 
-PS_SRC = src
-OUTPUT = output
-PS_SOURCEFILES = $(shell find ${PS_SRC} -type f -name \*.purs)
-PS_ERL_FFI = $(shell find ${PS_SRC} -type f -name \*.erl)
+all: build
 
-PACKAGE_SET = $(shell jq '.set' < psc-package.json)
-ERL_MODULES_VERSION = $(shell jq '."erl-modules".version' < .psc-package/$(PACKAGE_SET)/.set/packages.json)
+build:
+	spago build
 
-all: output docs
-
-output: $(PS_SOURCEFILES) $(PS_ERL_FFI) .psc-package
-	psc-package sources | xargs purs compile '$(PS_SRC)/**/*.purs'
-	@touch output
-
-.psc-package: psc-package.json
-	psc-package install
-	touch .psc-package
-
-clean:
-	rm -rf $(OUTPUT)/*
