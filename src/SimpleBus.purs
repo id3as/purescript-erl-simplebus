@@ -2,9 +2,7 @@ module SimpleBus where
 
 import Prelude
 import Effect (Effect)
-import Data.Maybe (Maybe(..))
 import Erl.Process.Raw (Pid)
-import Data.Newtype (unwrap, wrap, class Newtype)
 
 foreign import subscribe_ :: forall name msg. Bus name msg -> (msg -> Effect Unit) -> Effect SubscriptionRef
 
@@ -15,6 +13,7 @@ foreign import raise_ :: forall name msg. Bus name msg -> msg -> Effect Unit
 newtype SubscriptionRef
   = SubscriptionRef Pid
 
+newtype Bus :: forall k. Type -> k -> Type
 newtype Bus name msg
   = Bus name
 
@@ -22,7 +21,7 @@ bus :: forall msg name. name -> Bus name msg
 bus name = Bus $ name
 
 raise :: forall name msg. Bus name msg -> msg -> Effect Unit
-raise bus msg = raise_ bus msg
+raise onBus msg = raise_ onBus msg
 
 subscribe :: forall name msg. Bus name msg -> (msg -> Effect Unit) -> Effect SubscriptionRef
-subscribe bus callback = subscribe_ bus callback
+subscribe onBus callback = subscribe_ onBus callback

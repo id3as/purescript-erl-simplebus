@@ -15,8 +15,6 @@ to generate this file without the comments in this block.
 , dependencies =
   [ "effect"
   , "erl-process"
-  , "maybe"
-  , "newtype"
   , "prelude"
   , "psci-support"
   ]
