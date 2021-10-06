@@ -1,8 +1,16 @@
-module SimpleBus where
+module SimpleBus
+  ( Bus
+  , SubscriptionRef
+  , subscribe
+  , raise
+  , bus
+  ) where
 
 import Prelude
 import Effect (Effect)
+import Effect.Class (class MonadEffect, liftEffect)
 import Erl.Process.Raw (Pid)
+import Erl.Process (class HasSelf, self, send)
 
 foreign import subscribe_ :: forall name msg. Bus name msg -> (msg -> Effect Unit) -> Effect SubscriptionRef
 
@@ -23,5 +31,13 @@ bus name = Bus $ name
 raise :: forall name msg. Bus name msg -> msg -> Effect Unit
 raise onBus msg = raise_ onBus msg
 
-subscribe :: forall name msg. Bus name msg -> (msg -> Effect Unit) -> Effect SubscriptionRef
-subscribe onBus callback = subscribe_ onBus callback
+subscribe ::
+  forall m name msg msgOut.
+  HasSelf m msgOut =>
+  MonadEffect m =>
+  Bus name msg ->
+  (msg -> msgOut) ->
+  m SubscriptionRef
+subscribe onBus f = do
+  me <- self
+  liftEffect $ subscribe_ onBus (send me <<< f)
