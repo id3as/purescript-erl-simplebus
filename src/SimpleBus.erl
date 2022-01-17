@@ -1,12 +1,12 @@
 -module(simpleBus@foreign).
 
--export([ subscribe_/2
+-export([ subscribeImpl/2
         , unsubscribe/1
-        , raise_/2
+        , raiseImpl/2
         ]).
 
 
-subscribe_(BusName, Callback) ->
+subscribeImpl(BusName, Callback) ->
   Recipient = self(),
   Fun = fun Fun(MonitorRef) ->
               receive
@@ -37,7 +37,7 @@ unsubscribe(Ref) ->
   end.
 
 
-raise_(BusName, Msg) ->
+raiseImpl(BusName, Msg) ->
   fun() ->
     gproc:send({p,l,BusName}, Msg)
   end.
