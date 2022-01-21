@@ -15,7 +15,7 @@ import Effect.Class (class MonadEffect, liftEffect)
 import Erl.Process (class HasSelf, Process, self, send)
 import Erl.Process.Raw (Pid)
 
-foreign import subscribeImpl :: forall name msg. Bus name msg -> (msg -> Effect Unit) -> Effect SubscriptionRef
+foreign import subscribeImpl :: forall name msgIn msgOut. Bus name msgIn -> (Process msgOut) -> (msgIn -> msgOut) -> Effect SubscriptionRef
 
 foreign import unsubscribe :: SubscriptionRef -> Effect Unit
 
@@ -54,4 +54,4 @@ subscribe_ ::
   (msg -> msgOut) ->
   m SubscriptionRef
 subscribe_ onBus target f =
-  liftEffect $ subscribeImpl onBus (send target <<< f)
+  liftEffect $ subscribeImpl onBus target f
