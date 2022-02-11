@@ -6,13 +6,14 @@ module SimpleBus
   , raise
   , bus
   , unsubscribe
+  , enable
+  , disable
   ) where
 
 import Prelude
-
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
-import Erl.Process (class HasSelf, Process, self, send)
+import Erl.Process (class HasSelf, Process, self)
 import Erl.Process.Raw (Pid)
 
 foreign import subscribeImpl :: forall name msgIn msgOut. Bus name msgIn -> (Process msgOut) -> (msgIn -> msgOut) -> Effect SubscriptionRef
@@ -45,6 +46,8 @@ subscribe onBus f = do
   me <- self
   subscribe_ onBus me f
 
+foreign import enable :: forall name msg. Bus name msg -> Effect Unit
+foreign import disable :: forall name msg. Bus name msg -> Effect Unit
 
 subscribe_ ::
   forall m name msg msgOut.

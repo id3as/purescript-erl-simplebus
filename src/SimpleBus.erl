@@ -3,11 +3,13 @@
 -export([ subscribeImpl/3
         , unsubscribe/1
         , raiseImpl/2
+        , disable/1
+        , enable/1
         ]).
 
 
 subscribeImpl(BusName, Recipient, Mapper) ->
-  Fun = fun Fun(MonitorRef) ->
+  Fun = fun Fun(MonitorRef, Enabled) ->
               receive
                 stop ->
                   gproc:unreg({p, l, BusName}),
@@ -16,9 +18,15 @@ subscribeImpl(BusName, Recipient, Mapper) ->
                 {'DOWN', MonitorRef, _, _, _} ->
                   gproc:unreg({p, l, BusName}),
                   exit(normal);
-                Msg ->
+                disable ->
+                  Fun(MonitorRef, false);
+                enable ->
+                  Fun(MonitorRef, true);
+                {msg, Msg} when Enabled == true ->
                   Recipient ! Mapper(Msg),
-                  Fun(MonitorRef)
+                  Fun(MonitorRef, Enabled);
+                {msg, _Msg} when Enabled == false ->
+                  Fun(MonitorRef, Enabled)
               end
            end,
   fun() ->
@@ -28,7 +36,7 @@ subscribeImpl(BusName, Recipient, Mapper) ->
                                        gproc:reg({p, l, BusName}),
                                        MonitorRef = monitor(process, Recipient),
                                        Launcher ! Ref,
-                                       Fun(MonitorRef)
+                                       Fun(MonitorRef, true)
                                       end),
     receive
       Ref -> ok;
@@ -48,5 +56,15 @@ unsubscribe(Ref) ->
 
 raiseImpl(BusName, Msg) ->
   fun() ->
-    gproc:send({p,l,BusName}, Msg)
+    gproc:send({p,l,BusName}, {msg, Msg})
+  end.
+
+disable(BusName) ->
+  fun() ->
+      gproc:send({p,l,BusName}, disable)
+  end.
+
+enable(BusName) ->
+  fun() ->
+      gproc:send({p,l,BusName}, enable)
   end.
