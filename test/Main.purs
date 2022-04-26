@@ -35,7 +35,7 @@ sbTests = do
 
 canSendAndReceiveMessages :: Test.TestSuite
 canSendAndReceiveMessages = do
-  Test.test "Can send and receive messages from a single process" do
+  Test.test "Can send and receive messages" do
     me <- Raw.self
     _ <- spawnLink $ process me
     _ <- Raw.receive
@@ -55,7 +55,7 @@ canSendAndReceiveMessages = do
 
 canSendAndReceiveMappedMessages :: Test.TestSuite
 canSendAndReceiveMappedMessages = do
-  Test.test "Can send and receive messages from a single process" do
+  Test.test "Can send and receive messages with mapping" do
     me <- Raw.self
     _ <- spawnLink $ process me
     _ <- Raw.receive
