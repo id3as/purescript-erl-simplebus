@@ -25,7 +25,7 @@ foreign import raiseImpl :: forall name msg. Bus name msg -> msg -> Effect Unit
 newtype SubscriptionRef
   = SubscriptionRef Pid
 
-newtype Bus :: forall k. Type -> k -> Type
+newtype Bus :: forall k. Type -> k -> Type -- TODO - understand why k can't be called msg
 newtype Bus name msg
   = Bus name
 
@@ -44,17 +44,16 @@ subscribe ::
   m SubscriptionRef
 subscribe onBus f = do
   me <- self
-  subscribe_ onBus me f
+  liftEffect $ subscribe_ onBus me f
 
 foreign import enable :: forall name msg. Bus name msg -> Effect Unit
 foreign import disable :: forall name msg. Bus name msg -> Effect Unit
 
 subscribe_ ::
-  forall m name msg msgOut.
-  MonadEffect m =>
+  forall name msg msgOut.
   Bus name msg ->
   (Process msgOut) ->
   (msg -> msgOut) ->
-  m SubscriptionRef
+  Effect SubscriptionRef
 subscribe_ onBus target f =
-  liftEffect $ subscribeImpl onBus target f
+  subscribeImpl onBus target f

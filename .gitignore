@@ -9,3 +9,6 @@
 /.psa*
 /.spago
 /ebin
+_build
+nohup.out
+rebar.lock

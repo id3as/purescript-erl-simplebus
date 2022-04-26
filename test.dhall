@@ -7,6 +7,7 @@ in    conf
             conf.dependencies
           # [ "assert"
             , "debug"
+            , "erl-kernel"
             , "erl-test-eunit"
             , "exceptions"
             , "filterable"
