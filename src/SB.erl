@@ -2,18 +2,30 @@
 
 -include_lib("gproc/src/gproc_int.hrl").
 
--export([ subscribeImpl/2
+-export([ subscribeImpl/3
         , raise/2
+        , enable/1
+        , disable/1
+        , unsubscribe/1
         ]).
 
 -define(key(Name), {p,l,Name}).
+-define(enabled(MapperFn), {e, MapperFn}).
+-define(disabled(MapperFn), {d, MapperFn}).
 -define(unit, {unit}).
 
-subscribeImpl(BusName, Mapper) ->
+subscribeImpl(enabled, BusName, Mapper) ->
   fun() ->
-    true = gproc:reg(?key(BusName), {active, Mapper}),
-    ?unit
+      true = gproc:reg(?key(BusName), ?enabled(Mapper)),
+      ?unit
+  end;
+subscribeImpl(disabled, BusName, Mapper) ->
+  fun() ->
+      true = gproc:reg(?key(BusName), ?disabled(Mapper)),
+      ?unit
   end.
+
+
 
 %%------------------------------------------------------------------------------
 %% This code is taken from gproc.erl but slightly modified to extract and use
@@ -22,27 +34,35 @@ subscribeImpl(BusName, Mapper) ->
 %%------------------------------------------------------------------------------
 raise(BusName, Msg) ->
   fun() ->
-    Key = {p, l, BusName},
-    ?CATCH_GPROC_ERROR(send1(Key, Msg), [Key, Msg])
+      Key = ?key(BusName),
+      ?CATCH_GPROC_ERROR(send1(Key, Msg), [Key, Msg])
   end.
-
-
 
 disable(BusName) ->
   fun() ->
-      gproc:send({p,l,BusName}, disable),
+      Key = ?key(BusName),
+      case gproc:lookup_value(Key) of
+        ?enabled(Fn) -> gproc:set_value(Key, ?disabled(Fn));
+        ?disabled(_) -> ok
+      end,
       ?unit
   end.
 
 enable(BusName) ->
   fun() ->
-      gproc:send({p,l,BusName}, enable)
+      Key = ?key(BusName),
+      case gproc:get_value(Key) of
+        ?enabled(_) -> ok;
+        ?disabled(Fn) -> gproc:set_value(Key, ?enabled(Fn))
+      end,
+      ?unit
   end.
 
-unsubscribe(Ref) ->
+unsubscribe(BusName) ->
   fun() ->
-      Ref ! stop,
-      ok
+      Key = ?key(BusName),
+      gproc:unreg(Key),
+      ?unit
   end.
 
 
@@ -56,4 +76,4 @@ send1(Key, Msg) ->
                 end, lookup_pids(Key)).
 
 lookup_pids(Key) ->
-  ets:select(gproc, [{{{Key,'_'}, '$1', {active, '$2'}},[],[{{'$1','$2'}}]}]).
+  ets:select(gproc, [{{{Key,'_'}, '$1', ?enabled('$2')},[],[{{'$1','$2'}}]}]).

@@ -6,6 +6,7 @@ in    conf
       , dependencies =
             conf.dependencies
           # [ "assert"
+            , "datetime"
             , "debug"
             , "erl-kernel"
             , "erl-test-eunit"
