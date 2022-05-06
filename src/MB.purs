@@ -50,7 +50,6 @@ subscribeDisabled :: SubscribeAPI
 subscribeDisabled onBus f = do
   liftEffect $ subscribeImpl (atom "disabled") onBus f
 
-
 raise :: forall name msg metadata. Bus name msg metadata -> msg -> Effect Unit
 raise bus = raiseMsg bus <<< DataMsg
 -- testHelpers ::

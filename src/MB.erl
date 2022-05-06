@@ -22,6 +22,8 @@
 -define(metadataKey, md).
 -define(metadataAttribute(Md), {?metadataKey, Md}).
 
+-define(locked, locked).
+
 create(BusName, InitalMetadata) ->
   fun() ->
       gproc:reg(?gprocNameKey(BusName), undefined, [?metadataAttribute(InitalMetadata)]),
@@ -39,13 +41,15 @@ updateMetadata(BusName, Metadata) ->
 
 subscribeImpl(enabled, BusName, Mapper) ->
   fun() ->
+      PropertyKey = ?gprocPropertyKey(BusName),
       try
-        io:format(user, "subscribe ~p ~p~n", [BusName, ets:tab2list(gproc)]),
-        State = gproc:get_attribute(?gprocNameKey(BusName), ?metadataKey),
-        true = gproc:reg(?gprocPropertyKey(BusName), ?enabled(Mapper)),
-        ?just(State)
+        true = gproc:reg(PropertyKey, ?locked),
+        Metadata = gproc:get_attribute(?gprocNameKey(BusName), ?metadataKey),
+        true = gproc:set_value(PropertyKey, ?enabled(Mapper)),
+        ?just(Metadata)
       catch
         error:badarg ->
+          catch gproc:unreg(PropertyKey),
           ?nothing
       end
   end.
@@ -68,8 +72,6 @@ raiseMsg(BusName, Msg) ->
   end.
 
 raiseMsgInt(BusName, Msg) ->
-  io:format(user, "Raise ~p ~p~n", [BusName, Msg]),
-  io:format(user, "Table ~p~n", [ets:tab2list(gproc)]),
   Key = ?gprocPropertyKey(BusName),
   ?CATCH_GPROC_ERROR(send1(Key, Msg), [Key, Msg]).
 
@@ -106,13 +108,21 @@ unsubscribe(BusName) ->
 %% in gproc.erl
 %%------------------------------------------------------------------------------
 send1(Key, Msg) ->
-  lists:foreach(fun({Pid, Fn}) ->
-                    case Fn(Msg) of
-                      ?nothing -> ok;
-                      ?just(MappedMsg) ->
-                        Pid ! MappedMsg
-                    end
-                end, lookup_pids(Key)).
-
-lookup_pids(Key) ->
-  ets:select(gproc, [{{{Key,'_'}, '$1', ?enabled('$2')},[],[{{'$1','$2'}}]}]).
+  Entries = ets:select(gproc, [{{{Key,'_'}, '$1', '$2'},[],[{{'$1','$2'}}]}]),
+  case lists:any(fun({_, ?locked}) -> true;
+                    (_) -> false
+                 end,
+                 Entries) of
+    true ->
+      timer:sleep(0),
+      send1(Key, Msg);
+    false ->
+      lists:foreach(fun({Pid, ?enabled(Fn)}) ->
+                        case Fn(Msg) of
+                          ?nothing -> ok;
+                          ?just(MappedMsg) ->
+                            Pid ! MappedMsg
+                        end;
+                       (_) -> ok
+                    end, Entries)
+  end.
