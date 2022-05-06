@@ -5,7 +5,7 @@
 -export([ create/2
         , disable/1
         , enable/1
-        , raise/2
+        , raiseMsg/2
         , subscribeImpl/3
         , updateMetadata/2
         , unsubscribe/1
@@ -31,6 +31,7 @@ create(BusName, InitalMetadata) ->
 updateMetadata(BusName, Metadata) ->
   fun() ->
       gproc:set_attributes(?gprocNameKey(BusName), [?metadataAttribute(Metadata)]),
+      raiseMsgInt(BusName, {metadataMsg, Metadata}),
       ?unit
   end.
 
@@ -39,8 +40,9 @@ updateMetadata(BusName, Metadata) ->
 subscribeImpl(enabled, BusName, Mapper) ->
   fun() ->
       try
-        io:format(user, "Table ~p ~p~n", [BusName, ets:tab2list(gproc)]),
+        io:format(user, "subscribe ~p ~p~n", [BusName, ets:tab2list(gproc)]),
         State = gproc:get_attribute(?gprocNameKey(BusName), ?metadataKey),
+        true = gproc:reg(?gprocPropertyKey(BusName), ?enabled(Mapper)),
         ?just(State)
       catch
         error:badarg ->
@@ -60,11 +62,16 @@ subscribeImpl(enabled, BusName, Mapper) ->
 %% a stored mapping function per recipient and also to enable active / stopped
 %% toggling on busses
 %%------------------------------------------------------------------------------
-raise(BusName, Msg) ->
+raiseMsg(BusName, Msg) ->
   fun() ->
-      Key = ?gprocPropertyKey(BusName),
-      ?CATCH_GPROC_ERROR(send1(Key, Msg), [Key, Msg])
+      raiseMsgInt(BusName, Msg)
   end.
+
+raiseMsgInt(BusName, Msg) ->
+  io:format(user, "Raise ~p ~p~n", [BusName, Msg]),
+  io:format(user, "Table ~p~n", [ets:tab2list(gproc)]),
+  Key = ?gprocPropertyKey(BusName),
+  ?CATCH_GPROC_ERROR(send1(Key, Msg), [Key, Msg]).
 
 disable(BusName) ->
   fun() ->
@@ -100,7 +107,11 @@ unsubscribe(BusName) ->
 %%------------------------------------------------------------------------------
 send1(Key, Msg) ->
   lists:foreach(fun({Pid, Fn}) ->
-                    Pid ! Fn(Msg)
+                    case Fn(Msg) of
+                      ?nothing -> ok;
+                      ?just(MappedMsg) ->
+                        Pid ! MappedMsg
+                    end
                 end, lookup_pids(Key)).
 
 lookup_pids(Key) ->

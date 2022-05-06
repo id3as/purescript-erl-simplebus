@@ -13,5 +13,6 @@ in    conf
             , "exceptions"
             , "filterable"
             , "free"
+            , "partial"
             ]
       }

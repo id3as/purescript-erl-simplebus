@@ -1,7 +1,6 @@
 module Test.Main where
 
 import Prelude
-
 import Data.Time.Duration (Milliseconds(..))
 import Debug (spy)
 import Effect (Effect)

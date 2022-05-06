@@ -1,6 +1,6 @@
 module MB
   ( Bus
-  , BusMsg
+  , BusMsg(..)
   , BusRef
   , busRef
   , create
@@ -50,6 +50,9 @@ subscribeDisabled :: SubscribeAPI
 subscribeDisabled onBus f = do
   liftEffect $ subscribeImpl (atom "disabled") onBus f
 
+
+raise :: forall name msg metadata. Bus name msg metadata -> msg -> Effect Unit
+raise bus = raiseMsg bus <<< DataMsg
 -- testHelpers ::
 --   forall name msg.
 --   { disable :: Bus name msg -> Effect Unit
@@ -61,7 +64,7 @@ subscribeDisabled onBus f = do
 --   , disable: disable
 --   , subscribeDisabled: subscribeDisabled
 --   }
-foreign import raise :: forall name msg metadata. Bus name msg metadata -> BusMsg msg metadata -> Effect Unit
+foreign import raiseMsg :: forall name msg metadata. Bus name msg metadata -> BusMsg msg metadata -> Effect Unit
 foreign import enable :: forall name msg metadata. Bus name msg metadata -> Effect Unit
 foreign import disable :: forall name msg metadata. Bus name msg metadata -> Effect Unit
 foreign import unsubscribe :: forall name msg metadata. Bus name msg metadata -> Effect Unit
