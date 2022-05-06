@@ -62,17 +62,21 @@ mbTests = do
 
 subscribeToNonExistentBus = do
   Test.test "Subscribing to a non-existent bus returns nothing" do
-    me <- Raw.self
-    _ <- spawnLink $ subscriber me
-    _ <- Raw.receive
-    pure unit
+    unsafeRunProcessM theTest
   where
-  subscriber :: Raw.Pid -> ProcessM SubscriberMsg Unit
+  theTest :: ProcessM RunnerMsg Unit
+  theTest = do
+    me <- self
+    _ <- liftEffect $ spawnLink $ subscriber me
+    _ <- receive
+    pure unit
+
+  subscriber :: Process RunnerMsg -> ProcessM SubscriberMsg Unit
   subscriber parent = do
     res <- (subscribe testBus $ pure)
     liftEffect do
       assertNothing' "Should have no initial metadata" res
-      Raw.send parent unit
+      Process.send parent Complete
     pure unit
 
 
@@ -103,31 +107,28 @@ createThenSubscribe = do
 
 canUpdateMetadata = do
   Test.test "Can subscribe once a bus is created" do
-    me <- Raw.self
-    senderPid <- spawnLink $ sender me
-    _ <- Raw.receive
-    _ <- spawnLink $ subscriber me
-    _ <- Raw.receive
-    Process.send senderPid $ End -- allow the sender to exit so we are clean for the next test
-    pure unit
+    unsafeRunProcessM theTest
   where
-  sender :: Raw.Pid -> ProcessM SenderMsg Unit
-  sender parent = liftEffect  do
-    bus <- create testBus $ TestMetadata 0
-    updateMetadata bus $ TestMetadata 1
+  theTest :: ProcessM RunnerMsg Unit
+  theTest = do
+      me <- self
+      senderPid <- liftEffect $ spawnLink $ sender me (TestMetadata 0) Nothing
+      liftEffect $ Process.send senderPid { req: SetMetadata (TestMetadata 1)
+                                          , resp: Just MetadataSet
+                                          }
+      _ <- receive
+      _ <- liftEffect $ spawnLink $ subscriber me
+      _ <- receive
+      liftEffect $ Process.send senderPid $ {req: End, resp: Nothing} -- allow the sender to exit so we are clean for the next test
+      pure unit
 
-    liftEffect do
-      Raw.send parent unit -- tell parent the bus is created
-      void Raw.receive -- wait so that the bus stays in place
-    pure unit
-
-  subscriber :: Raw.Pid -> ProcessM SubscriberMsg Unit
+  subscriber :: Process RunnerMsg -> ProcessM SubscriberMsg Unit
   subscriber parent = do
     res <- (subscribe testBus pure)
     let _ = spy "res2" res
     liftEffect do
       assertEqual' "Initial metadata has been updated" {actual: res, expected: Just $ TestMetadata 1}
-      Raw.send parent unit
+      Process.send parent Complete
     pure unit
 
 sender :: Process RunnerMsg -> Metadata -> Maybe RunnerMsg -> ProcessM SenderRequest Unit
