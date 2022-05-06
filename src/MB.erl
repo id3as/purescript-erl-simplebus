@@ -2,11 +2,12 @@
 
 -include_lib("gproc/src/gproc_int.hrl").
 
--export([ subscribeImpl/3
-        , create/2
-        , raise/2
-        , enable/1
+-export([ create/2
         , disable/1
+        , enable/1
+        , raise/2
+        , subscribeImpl/3
+        , updateMetadata/2
         , unsubscribe/1
         ]).
 
@@ -26,6 +27,14 @@ create(BusName, InitalMetadata) ->
       gproc:reg(?gprocNameKey(BusName), undefined, [?metadataAttribute(InitalMetadata)]),
       BusName
   end.
+
+updateMetadata(BusName, Metadata) ->
+  fun() ->
+      gproc:set_attributes(?gprocNameKey(BusName), [?metadataAttribute(Metadata)]),
+      ?unit
+  end.
+
+
 
 subscribeImpl(enabled, BusName, Mapper) ->
   fun() ->
