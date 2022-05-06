@@ -32,7 +32,7 @@ instance Show Metadata where
 
 type SubscriberMsg = BusMsg MbMsg Metadata
 
-data SenderMsg = Unit
+data SenderMsg = ContinueSender
 
 data Timeout
   = Timeout
@@ -43,7 +43,7 @@ instance Show Timeout where
 mbTests :: Test.TestSuite
 mbTests = do
   Test.suite "metadata bus tests" do
-  --  subscribeToNonExistentBus
+    subscribeToNonExistentBus
     createThenSubscribe
 
 subscribeToNonExistentBus = do
@@ -65,11 +65,11 @@ subscribeToNonExistentBus = do
 createThenSubscribe = do
   Test.test "Can subscribe once a bus is created" do
     me <- Raw.self
-    _ <- spawnLink $ sender me
+    senderPid <- spawnLink $ sender me
     _ <- Raw.receive
     _ <- spawnLink $ subscriber me
     _ <- Raw.receive
-
+    Process.send senderPid ContinueSender -- allow the sender to exit so we are clean for the next test
     pure unit
   where
   sender :: Raw.Pid -> ProcessM SenderMsg Unit
