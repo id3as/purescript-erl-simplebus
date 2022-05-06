@@ -3,6 +3,7 @@ module MB
   , BusMsg
   , BusRef
   , busRef
+  , create
   , raise
   , subscribe
   --, testHelpers
@@ -36,6 +37,8 @@ foreign import subscribeImpl :: forall name msg metadata msgOut. Atom -> BusRef 
 
 type SubscribeAPI
   = forall m name msg metadata msgOut. HasSelf m msgOut => MonadEffect m => BusRef name msg metadata -> (BusMsg msg metadata -> Maybe msgOut) -> m (Maybe metadata)
+
+foreign import create :: forall name msg metadata. BusRef name msg metadata -> metadata -> Effect (Bus name msg metadata)
 
 subscribe :: SubscribeAPI
 subscribe onBus f = do

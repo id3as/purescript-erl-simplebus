@@ -3,24 +3,35 @@
 -include_lib("gproc/src/gproc_int.hrl").
 
 -export([ subscribeImpl/3
+        , create/2
         , raise/2
         , enable/1
         , disable/1
         , unsubscribe/1
         ]).
 
--define(pKey(Name), {p,l,Name}).
--define(nKey(Name), {n,l,Name}).
+-define(gprocPropertyKey(Name), {p,l,Name}).
+-define(gprocNameKey(Name), {n,l,Name}).
 -define(enabled(MapperFn), {e, MapperFn}).
 -define(disabled(MapperFn), {d, MapperFn}).
 -define(unit, {unit}).
 -define(just(A), {just, A}).
 -define(nothing, {nothing}).
 
+-define(metadataKey, md).
+-define(metadataAttribute(Md), {?metadataKey, Md}).
+
+create(BusName, InitalMetadata) ->
+  fun() ->
+      gproc:reg(?gprocNameKey(BusName), undefined, [?metadataAttribute(InitalMetadata)]),
+      BusName
+  end.
+
 subscribeImpl(enabled, BusName, Mapper) ->
   fun() ->
       try
-        State = gproc:get_attribute(?nKey(BusName), state),
+        io:format(user, "Table ~p ~p~n", [BusName, ets:tab2list(gproc)]),
+        State = gproc:get_attribute(?gprocNameKey(BusName), ?metadataKey),
         ?just(State)
       catch
         error:badarg ->
@@ -29,7 +40,7 @@ subscribeImpl(enabled, BusName, Mapper) ->
   end.
 %% subscribeImpl(disabled, BusName, Mapper) ->
 %%   fun() ->
-%%       true = gproc:reg(?pKey(BusName), ?disabled(Mapper)),
+%%       true = gproc:reg(?gprocPropertyKey(BusName), ?disabled(Mapper)),
 %%       ?unit
 %%   end.
 
@@ -42,13 +53,13 @@ subscribeImpl(enabled, BusName, Mapper) ->
 %%------------------------------------------------------------------------------
 raise(BusName, Msg) ->
   fun() ->
-      Key = ?pKey(BusName),
+      Key = ?gprocPropertyKey(BusName),
       ?CATCH_GPROC_ERROR(send1(Key, Msg), [Key, Msg])
   end.
 
 disable(BusName) ->
   fun() ->
-      Key = ?pKey(BusName),
+      Key = ?gprocPropertyKey(BusName),
       case gproc:lookup_value(Key) of
         ?enabled(Fn) -> gproc:set_value(Key, ?disabled(Fn));
         ?disabled(_) -> ok
@@ -58,7 +69,7 @@ disable(BusName) ->
 
 enable(BusName) ->
   fun() ->
-      Key = ?pKey(BusName),
+      Key = ?gprocPropertyKey(BusName),
       case gproc:get_value(Key) of
         ?enabled(_) -> ok;
         ?disabled(Fn) -> gproc:set_value(Key, ?enabled(Fn))
@@ -68,7 +79,7 @@ enable(BusName) ->
 
 unsubscribe(BusName) ->
   fun() ->
-      Key = ?pKey(BusName),
+      Key = ?gprocPropertyKey(BusName),
       gproc:unreg(Key),
       ?unit
   end.
