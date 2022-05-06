@@ -13,7 +13,7 @@ to generate this file without the comments in this block.
 { name = "erl-simplebus"
 , backend = "purerl"
 , dependencies =
-  [ "effect", "erl-atom", "erl-process", "prelude", "psci-support" ]
+  [ "effect", "erl-atom", "erl-process", "maybe", "prelude", "psci-support" ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]
 }

@@ -15,14 +15,15 @@ import Erl.Process.Raw as Raw
 import Erl.Test.EUnit as Test
 import SB (Bus, subscribe, raise, bus, testHelpers)
 import Test.Assert (assertEqual')
+import Test.MetadataBus (mbTests)
 
 data Msg
   = TestMsg Int
 instance Show Timeout where
   show Timeout = "Timeout"
 
-
-data Timeout = Timeout
+data Timeout
+  = Timeout
 derive instance Eq Timeout
 
 derive instance Eq Msg
@@ -32,7 +33,8 @@ instance Show Msg where
 main :: Effect Unit
 main = do
   void $ ensureAllStarted $ atom "gproc"
-  void $ Test.runTests sbTests
+  --void $ Test.runTests sbTests
+  void $ Test.runTests mbTests
 
 sbTests :: Test.TestSuite
 sbTests = do
@@ -115,13 +117,11 @@ enableDisable = do
     -- spawn the child and wait for it to say it has subscribed (disabled)
     child <- spawnLink $ process me
     _ <- Raw.receive
-
     liftEffect do
       raise testBus $ TestMsg 1
       -- Wait to confirm the child did NOT receive this (disabled)
       msg1 <- Raw.receiveWithTimeout (Milliseconds 10.0) Timeout
       assertEqual' "No message initially" { actual: msg1, expected: Timeout }
-
       -- Send child a message for them to enable the bus
       Raw.send (toPid child) $ TestMsg 1000
       sleep (Milliseconds 10.0)
@@ -129,8 +129,6 @@ enableDisable = do
     -- they should receive that message
     msg2 <- Raw.receive
     assertEqual' "Child received mapped message" { actual: msg2, expected: TestMsg 3 }
-
-
     pure unit
   where
   mapper :: Msg -> Msg
@@ -146,14 +144,12 @@ enableDisable = do
       -- wait for the parent to ask us to continue (after the first raise has not arrived, as we are disabled)
       msg1 <- Raw.receive
       assertEqual' "Continue message from parent" { actual: msg1, expected: TestMsg 1000 }
-
       testHelpers.enable testBus
     msg2 <- Process.receive
     liftEffect do
       assertEqual' "Mapper is applied" { actual: msg2, expected: TestMsg 3 }
       Raw.send parent msg2
     pure unit
-
 
 testBus :: Bus Atom Msg
 testBus = bus (atom "test-bus")
