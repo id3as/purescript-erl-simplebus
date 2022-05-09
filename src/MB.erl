@@ -6,21 +6,24 @@
         , disable/1
         , enable/1
         , raiseMsg/2
-        , subscribeImpl/3
+        , subscribeImpl/4
+        , subscribeExistingImpl/3
         , updateMetadata/2
         , unsubscribe/1
         ]).
 
--define(gprocPropertyKey(Name), {p,l,Name}).
--define(gprocNameKey(Name), {n,l,Name}).
--define(enabled(MapperFn), {e, MapperFn}).
--define(disabled(MapperFn), {d, MapperFn}).
 -define(unit, {unit}).
 -define(just(A), {just, A}).
 -define(nothing, {nothing}).
 
+-define(gprocPropertyKey(Name), {p,l,Name}).
+-define(gprocNameKey(Name), {n,l,Name}).
 -define(metadataKey, md).
 -define(metadataAttribute(Md), {?metadataKey, Md}).
+-define(enabled(MapperFn), {e, MapperFn}).
+-define(disabled(MapperFn), {d, MapperFn}).
+
+
 
 -define(locked, locked).
 
@@ -37,28 +40,42 @@ updateMetadata(BusName, Metadata) ->
       ?unit
   end.
 
-
-
-subscribeImpl(enabled, BusName, Mapper) ->
+subscribeImpl(Enabled, BusName, Mapper, MetadataConstructor) ->
   fun() ->
-      PropertyKey = ?gprocPropertyKey(BusName),
-      try
-        true = gproc:reg(PropertyKey, ?locked),
-        Metadata = gproc:get_attribute(?gprocNameKey(BusName), ?metadataKey),
-        true = gproc:set_value(PropertyKey, ?enabled(Mapper)),
-        ?just(Metadata)
-      catch
-        error:badarg ->
-          catch gproc:unreg(PropertyKey),
-          ?nothing
-      end
+      MaybeMetadata = subscribeLocked(Enabled, BusName, ?just(MetadataConstructor)),
+      case MaybeMetadata of
+        ?just(ExistingMetadata) ->
+          self() ! Mapper(MetadataConstructor(ExistingMetadata));
+        _ ->
+          ok
+      end,
+      true = gproc:set_value(?gprocPropertyKey(BusName), ?enabled(Mapper)),
+      ?unit
   end.
-%% subscribeImpl(disabled, BusName, Mapper) ->
-%%   fun() ->
-%%       true = gproc:reg(?gprocPropertyKey(BusName), ?disabled(Mapper)),
-%%       ?unit
-%%   end.
 
+
+subscribeExistingImpl(Enabled, BusName, Mapper) ->
+  fun() ->
+      MaybeMetadata = subscribeLocked(Enabled, BusName, ?nothing),
+      case MaybeMetadata of
+        ?just(_) ->
+          true = gproc:set_value(?gprocPropertyKey(BusName), ?enabled(Mapper));
+        ?nothing ->
+          catch gproc:unreg(?gprocPropertyKey(BusName))
+      end,
+      MaybeMetadata
+  end.
+
+
+subscribeLocked(enabled, BusName, MaybeMetadataConstructor) ->
+  try
+    true = gproc:reg(?gprocPropertyKey(BusName), ?locked),
+    Metadata = gproc:get_attribute(?gprocNameKey(BusName), ?metadataKey),
+    ?just(Metadata)
+  catch
+    error:badarg ->
+      ?nothing
+  end.
 
 
 %%------------------------------------------------------------------------------

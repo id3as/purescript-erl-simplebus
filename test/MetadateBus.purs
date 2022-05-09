@@ -9,7 +9,7 @@ import Erl.Atom (Atom, atom)
 import Erl.Process (Process, ProcessM, receive, self, spawnLink, unsafeRunProcessM)
 import Erl.Process as Process
 import Erl.Test.EUnit as Test
-import MB (Bus, BusMsg(..), BusRef, busRef, create, raise, subscribe, updateMetadata)
+import MB (Bus, BusMsg(..), BusRef, busRef, create, raise, subscribeExisting, updateMetadata)
 import Partial.Unsafe (unsafeCrashWith)
 import Test.Assert (assertEqual, assertEqual', assertTrue')
 
@@ -60,14 +60,14 @@ instance Show Timeout where
 mbTests :: Test.TestSuite
 mbTests = do
   Test.suite "metadata bus tests" do
-    subscribeToNonExistentBus
-    createThenSubscribe
+    subscribeExistingToNonExistentBus
+    createThenSubscribeExisting
     canUpdateMetadataPriorToSubscription
     canUpdateMetadataPostSubscription
     canReceiveMessages
 
-subscribeToNonExistentBus :: Test.TestSuite
-subscribeToNonExistentBus = do
+subscribeExistingToNonExistentBus :: Test.TestSuite
+subscribeExistingToNonExistentBus = do
   Test.test "Subscribing to a non-existent bus returns nothing" do
     unsafeRunProcessM theTest
   where
@@ -80,15 +80,15 @@ subscribeToNonExistentBus = do
 
   subscriber :: Process RunnerMsg -> ProcessM SubscriberMsg Unit
   subscriber parent = do
-    res <- subscribe testBus pure
+    res <- subscribeExisting testBus pure
     liftEffect do
       assertNothing' "Should have no initial metadata" res
       Process.send parent Complete
     pure unit
 
-createThenSubscribe :: Test.TestSuite
-createThenSubscribe = do
-  Test.test "Can subscribe once a bus is created" do
+createThenSubscribeExisting :: Test.TestSuite
+createThenSubscribeExisting = do
+  Test.test "Can subscribeExisting once a bus is created" do
     unsafeRunProcessM theTest
   where
   theTest :: ProcessM RunnerMsg Unit
@@ -103,7 +103,7 @@ createThenSubscribe = do
 
   subscriber :: Process RunnerMsg -> ProcessM SubscriberMsg Unit
   subscriber parent = do
-    res <- subscribe testBus pure
+    res <- subscribeExisting testBus pure
     liftEffect do
       assertEqual' "Initial metadata matches" { actual: res, expected: Just $ TestMetadata 0 }
       Process.send parent Complete
@@ -131,7 +131,7 @@ canUpdateMetadataPriorToSubscription = do
 
   subscriber :: Process RunnerMsg -> ProcessM SubscriberMsg Unit
   subscriber parent = do
-    res <- subscribe testBus pure
+    res <- subscribeExisting testBus pure
     liftEffect do
       assertEqual' "Initial metadata has been updated" { actual: res, expected: Just $ TestMetadata 1 }
       Process.send parent Complete
@@ -157,7 +157,7 @@ canUpdateMetadataPostSubscription = do
 
   subscriber1 :: Process RunnerMsg -> ProcessM SubscriberMsg Unit
   subscriber1 parent = do
-    res <- subscribe testBus pure
+    res <- subscribeExisting testBus pure
     liftEffect do
       assertEqual' "Initial metadata received" { actual: res, expected: Just $ TestMetadata 0 }
       Process.send parent (SubscriberStepCompleted 0)
@@ -193,7 +193,7 @@ canReceiveMessages = do
 
   subscriber1 :: Process RunnerMsg -> ProcessM SubscriberMsg Unit
   subscriber1 parent = do
-    res <- subscribe testBus pure
+    res <- subscribeExisting testBus pure
     liftEffect do
       assertEqual' "Initial metadata received" { actual: res, expected: Just $ TestMetadata 0 }
       Process.send parent (SubscriberStepCompleted 0)

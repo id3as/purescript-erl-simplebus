@@ -5,7 +5,7 @@ module MB
   , busRef
   , create
   , raise
-  , subscribe
+  , subscribeExisting
   , updateMetadata
   --, testHelpers
   , unsubscribe
@@ -34,7 +34,8 @@ data BusMsg msg metadata
   | MetadataMsg metadata
   | BusTerminated
 
-foreign import subscribeImpl :: forall name msg metadata msgOut. Atom -> BusRef name msg metadata -> (BusMsg msg metadata -> Maybe msgOut) -> Effect (Maybe metadata)
+foreign import subscribeImpl :: forall name msg metadata msgOut. Atom -> BusRef name msg metadata -> (BusMsg msg metadata -> Maybe msgOut) -> Effect Unit
+foreign import subscribeExistingImpl :: forall name msg metadata msgOut. Atom -> BusRef name msg metadata -> (BusMsg msg metadata -> Maybe msgOut) -> Effect (Maybe metadata)
 
 type SubscribeAPI
   = forall m name msg metadata msgOut. HasSelf m msgOut => MonadEffect m => BusRef name msg metadata -> (BusMsg msg metadata -> Maybe msgOut) -> m (Maybe metadata)
@@ -42,13 +43,13 @@ type SubscribeAPI
 foreign import create :: forall name msg metadata. BusRef name msg metadata -> metadata -> Effect (Bus name msg metadata)
 foreign import updateMetadata :: forall name msg metadata. Bus name msg metadata -> metadata -> Effect Unit
 
-subscribe :: SubscribeAPI
-subscribe onBus f = do
-  liftEffect $ subscribeImpl (atom "enabled") onBus f
+subscribeExisting :: SubscribeAPI
+subscribeExisting onBus f = do
+  liftEffect $ subscribeExistingImpl (atom "enabled") onBus f
 
 subscribeDisabled :: SubscribeAPI
 subscribeDisabled onBus f = do
-  liftEffect $ subscribeImpl (atom "disabled") onBus f
+  liftEffect $ subscribeExistingImpl (atom "disabled") onBus f
 
 raise :: forall name msg metadata. Bus name msg metadata -> msg -> Effect Unit
 raise bus = raiseMsg bus <<< DataMsg
