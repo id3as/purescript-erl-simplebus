@@ -30,6 +30,7 @@
 create(BusName, InitalMetadata) ->
   fun() ->
       gproc:reg(?gprocNameKey(BusName), undefined, [?metadataAttribute(InitalMetadata)]),
+      raiseMsgInt(BusName, {metadataMsg, InitalMetadata}),
       BusName
   end.
 
@@ -40,19 +41,18 @@ updateMetadata(BusName, Metadata) ->
       ?unit
   end.
 
-subscribeImpl(Enabled, BusName, Mapper, MetadataConstructor) ->
+subscribeImpl(Enabled, MetadataConstructor, BusName, Mapper) ->
   fun() ->
       MaybeMetadata = subscribeLocked(Enabled, BusName, ?just(MetadataConstructor)),
       case MaybeMetadata of
         ?just(ExistingMetadata) ->
-          self() ! Mapper(MetadataConstructor(ExistingMetadata));
-        _ ->
+          maybe_send(self(), Mapper(MetadataConstructor(ExistingMetadata)));
+        ?nothing ->
           ok
       end,
       true = gproc:set_value(?gprocPropertyKey(BusName), ?enabled(Mapper)),
       ?unit
   end.
-
 
 subscribeExistingImpl(Enabled, BusName, Mapper) ->
   fun() ->
@@ -66,7 +66,6 @@ subscribeExistingImpl(Enabled, BusName, Mapper) ->
       MaybeMetadata
   end.
 
-
 subscribeLocked(enabled, BusName, MaybeMetadataConstructor) ->
   try
     true = gproc:reg(?gprocPropertyKey(BusName), ?locked),
@@ -77,12 +76,6 @@ subscribeLocked(enabled, BusName, MaybeMetadataConstructor) ->
       ?nothing
   end.
 
-
-%%------------------------------------------------------------------------------
-%% This code is taken from gproc.erl but slightly modified to extract and use
-%% a stored mapping function per recipient and also to enable active / stopped
-%% toggling on busses
-%%------------------------------------------------------------------------------
 raiseMsg(BusName, Msg) ->
   fun() ->
       raiseMsgInt(BusName, Msg)
@@ -119,7 +112,6 @@ unsubscribe(BusName) ->
       ?unit
   end.
 
-
 %%------------------------------------------------------------------------------
 %% Internal functions - being slight variants of the functions by the same name
 %% in gproc.erl
@@ -135,11 +127,13 @@ send1(Key, Msg) ->
       send1(Key, Msg);
     false ->
       lists:foreach(fun({Pid, ?enabled(Fn)}) ->
-                        case Fn(Msg) of
-                          ?nothing -> ok;
-                          ?just(MappedMsg) ->
-                            Pid ! MappedMsg
-                        end;
+                        maybe_send(Pid, Fn(Msg));
                        (_) -> ok
                     end, Entries)
   end.
+
+
+maybe_send(_, ?nothing) -> ok;
+maybe_send(Pid, ?just(MappedMsg)) ->
+  %% io:format(user, "Sending ~p to ~p~n", [MappedMsg, Pid]),
+  Pid ! MappedMsg.
