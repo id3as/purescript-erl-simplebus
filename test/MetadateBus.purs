@@ -69,9 +69,9 @@ subscribeTests = do
   Test.suite "subscribeExisting tests" do
     nonExistentBus
     createThenSubscribe
-    -- canUpdateMetadataPriorToSubscription
-    -- canUpdateMetadataPostSubscription
-    -- canReceiveMessages
+    canUpdateMetadataPriorToSubscription
+    canUpdateMetadataPostSubscription
+    canReceiveMessages
 
 nonExistentBus :: Test.TestSuite
 nonExistentBus = do
@@ -124,6 +124,87 @@ createThenSubscribe = do
     await $ MetadataMsg (TestMetadata 0)
     liftEffect $ Process.send parent (SubscriberStepCompleted 1)
 
+
+canUpdateMetadataPriorToSubscription :: Test.TestSuite
+canUpdateMetadataPriorToSubscription = do
+  Test.test "On subscription, you are sent the most up to date metadata" do
+    unsafeRunProcessM theTest
+  where
+  theTest :: ProcessM RunnerMsg Unit
+  theTest = do
+    me <- self
+    senderPid <- liftEffect $ spawnLink $ sender me (TestMetadata 0) Nothing
+    liftEffect
+      $ Process.send senderPid
+          { req: SetMetadata (TestMetadata 1)
+          , resp: Just MetadataSet
+          }
+    await MetadataSet
+    _ <- liftEffect $ spawnLink $ subscriber me
+    await Complete
+    liftEffect $ Process.send senderPid $ { req: End, resp: Nothing } -- allow the sender to exit so we are clean for the next test
+    pure unit
+
+  subscriber :: Process RunnerMsg -> ProcessM SubscriberMsg Unit
+  subscriber parent = do
+    subscribe testBus pure
+    await $ MetadataMsg (TestMetadata 1)
+    liftEffect $ Process.send parent Complete
+
+canUpdateMetadataPostSubscription :: Test.TestSuite
+canUpdateMetadataPostSubscription = do
+  Test.test "Changes to metadata are sent to active subscribers" do
+    unsafeRunProcessM theTest
+  where
+  theTest :: ProcessM RunnerMsg Unit
+  theTest = do
+    me <- self
+    senderPid <- liftEffect $ spawnLink $ sender me (TestMetadata 0) (Just MetadataSet)
+    await MetadataSet
+    _ <- liftEffect $ spawnLink $ subscriber me
+    await $ SubscriberStepCompleted 0
+    liftEffect
+      $ Process.send senderPid { req: SetMetadata (TestMetadata 1), resp: Nothing }
+    await $ SubscriberStepCompleted 1
+    liftEffect $ Process.send senderPid $ { req: End, resp: Nothing }
+    pure unit
+
+  subscriber :: Process RunnerMsg -> ProcessM SubscriberMsg Unit
+  subscriber parent = do
+    subscribe testBus pure
+    await $ MetadataMsg $TestMetadata 0
+    liftEffect $ Process.send parent (SubscriberStepCompleted 0)
+    await $ MetadataMsg $TestMetadata 1
+    liftEffect $ Process.send parent (SubscriberStepCompleted 1)
+
+
+canReceiveMessages :: Test.TestSuite
+canReceiveMessages = do
+  Test.test "Data messages are sent to active subscribers" do
+    unsafeRunProcessM theTest
+  where
+  theTest :: ProcessM RunnerMsg Unit
+  theTest = do
+    me <- self
+    senderPid <- liftEffect $ spawnLink $ sender me (TestMetadata 0) (Just MetadataSet)
+    await MetadataSet
+    _ <- liftEffect $ spawnLink $ subscriber me
+    await $ SubscriberStepCompleted 0
+    liftEffect do
+      Process.send senderPid { req: RaiseMsg (TestMsg 1), resp: Nothing }
+      Process.send senderPid { req: RaiseMsg (TestMsg 2), resp: Nothing }
+    await $ Complete
+    liftEffect $ Process.send senderPid $ { req: End, resp: Nothing }
+    pure unit
+
+  subscriber :: Process RunnerMsg -> ProcessM SubscriberMsg Unit
+  subscriber parent = do
+    subscribe testBus pure
+    await $ MetadataMsg $TestMetadata 0
+    liftEffect $ Process.send parent (SubscriberStepCompleted 0)
+    await $ DataMsg $ TestMsg 1
+    await $ DataMsg $ TestMsg 2
+    liftEffect $ Process.send parent Complete
 
 
 subscribeExistingTests :: Test.TestSuite
@@ -180,7 +261,7 @@ seCreateThenSubscribe = do
 
 seCanUpdateMetadataPriorToSubscription :: Test.TestSuite
 seCanUpdateMetadataPriorToSubscription = do
-  Test.test "One subscription, you get the most up to date metadata" do
+  Test.test "On subscription, you get the most up to date metadata" do
     unsafeRunProcessM theTest
   where
   theTest :: ProcessM RunnerMsg Unit
@@ -216,7 +297,7 @@ seCanUpdateMetadataPostSubscription = do
     me <- self
     senderPid <- liftEffect $ spawnLink $ sender me (TestMetadata 0) (Just MetadataSet)
     await MetadataSet
-    _ <- liftEffect $ spawnLink $ subscriber1 me
+    _ <- liftEffect $ spawnLink $ subscriber me
     await $ SubscriberStepCompleted 0
     liftEffect
       $ Process.send senderPid { req: SetMetadata (TestMetadata 1), resp: Nothing }
@@ -224,8 +305,8 @@ seCanUpdateMetadataPostSubscription = do
     liftEffect $ Process.send senderPid $ { req: End, resp: Nothing }
     pure unit
 
-  subscriber1 :: Process RunnerMsg -> ProcessM SubscriberMsg Unit
-  subscriber1 parent = do
+  subscriber :: Process RunnerMsg -> ProcessM SubscriberMsg Unit
+  subscriber parent = do
     res <- subscribeExisting testBus pure
     liftEffect do
       assertEqual' "Initial metadata received" { actual: res, expected: Just $ TestMetadata 0 }
@@ -243,7 +324,7 @@ seCanReceiveMessages = do
     me <- self
     senderPid <- liftEffect $ spawnLink $ sender me (TestMetadata 0) (Just MetadataSet)
     await MetadataSet
-    _ <- liftEffect $ spawnLink $ subscriber1 me
+    _ <- liftEffect $ spawnLink $ subscriber me
     await $ SubscriberStepCompleted 0
     liftEffect do
       Process.send senderPid { req: RaiseMsg (TestMsg 1), resp: Nothing }
@@ -252,8 +333,8 @@ seCanReceiveMessages = do
     liftEffect $ Process.send senderPid $ { req: End, resp: Nothing }
     pure unit
 
-  subscriber1 :: Process RunnerMsg -> ProcessM SubscriberMsg Unit
-  subscriber1 parent = do
+  subscriber :: Process RunnerMsg -> ProcessM SubscriberMsg Unit
+  subscriber parent = do
     res <- subscribeExisting testBus pure
     liftEffect do
       assertEqual' "Initial metadata received" { actual: res, expected: Just $ TestMetadata 0 }

@@ -32,7 +32,7 @@ instance Show Msg where
 main :: Effect Unit
 main = do
   void $ ensureAllStarted $ atom "gproc"
-  --void $ Test.runTests sbTests
+  void $ Test.runTests sbTests
   void $ Test.runTests mbTests
 
 sbTests :: Test.TestSuite
