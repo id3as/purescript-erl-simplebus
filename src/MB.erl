@@ -16,8 +16,8 @@
 -define(just(A), {just, A}).
 -define(nothing, {nothing}).
 
--define(gprocPropertyKey(Name), {p,l,Name}).
--define(gprocNameKey(Name), {n,l,Name}).
+-define(gprocPropertyKey(Name), {p,l,{mb, Name}}).
+-define(gprocNameKey(Name), {n,l,{mb, Name}}).
 -define(metadataKey, md).
 -define(metadataAttribute(Md), {?metadataKey, Md}).
 -define(enabled(MapperFn), {e, MapperFn}).

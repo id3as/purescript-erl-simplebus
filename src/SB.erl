@@ -9,7 +9,7 @@
         , unsubscribe/1
         ]).
 
--define(key(Name), {p,l,Name}).
+-define(key(Name), {p,l, {sb, Name}}).
 -define(enabled(MapperFn), {e, MapperFn}).
 -define(disabled(MapperFn), {d, MapperFn}).
 -define(unit, {unit}).
